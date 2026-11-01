@@ -1,6 +1,7 @@
+
 Flask
 python-dotenv
-pypdf
+PyMuPDF
 python-docx
 sentence-transformers
 scikit-learn
@@ -9,3 +10,4 @@ pandas
 langchain
 langchain-community
 chromadb
+pypdf
