@@ -1,171 +1,375 @@
 
 from flask import Flask, request, render_template_string
-from werkzeug.utils import secure_filename
 import os
+from werkzeug.utils import secure_filename
 
 from src.resume_parser import extract_resume_text
 from src.resume_analyzer import extract_resume_details
 from src.job_analyzer import analyze_job_description
+from src.matcher import calculate_match
+from src.semantic_matcher import semantic_search
 from src.skill_gap_analyzer import analyze_skill_gaps
+from src.resume_recommender import generate_resume_recommendations
 
 
-# Initialize Flask application
 app = Flask(__name__)
 
-# Upload configuration
 UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {"pdf", "docx"}
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
-app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB
 
 
-# HTML Interface
+
 HTML = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>GenAI Resume & Job Match Analyzer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>GenAI Resume Analyzer</title>
 
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-            background-color: #f4f6f9;
-        }
-
-        .container {
-            max-width: 850px;
-            margin: auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-        }
-
-        h1 {
-            color: #243b64;
-        }
-
-        textarea {
-            width: 100%;
-            padding: 10px;
+        * {
             box-sizing: border-box;
         }
 
-        button {
-            background: #2457a7;
-            color: white;
-            padding: 12px 20px;
-            border: none;
-            cursor: pointer;
-            border-radius: 5px;
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #1e293b;
         }
 
-        .result {
-            margin-top: 25px;
-            padding: 20px;
-            background: #eef5ff;
+        header {
+            background: #14213d;
+            color: white;
+            padding: 22px 7%;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 25px;
+        }
+
+        header p {
+            color: #cbd5e1;
+            margin-bottom: 0;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 35px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 3px 15px rgba(0,0,0,.05);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #14213d;
+        }
+
+        h3 {
+            color: #334155;
+        }
+
+        input[type="file"],
+        textarea {
+            width: 100%;
+            margin: 12px 0 20px;
+            padding: 13px;
+            border: 1px solid #dbe2ea;
             border-radius: 8px;
+            background: #fff;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 13px 25px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
         }
 
         .score {
-            font-size: 30px;
+            font-size: 42px;
             font-weight: bold;
-            color: #16834a;
+            color: #16a34a;
+            margin: 10px 0;
+        }
+
+        .progress {
+            background: #e2e8f0;
+            height: 12px;
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: #16a34a;
+            height: 100%;
+            border-radius: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .stat {
+            padding: 20px;
+            border-radius: 10px;
+            background: #f8fafc;
+        }
+
+        .stat strong {
+            font-size: 27px;
+        }
+
+        .green {
+            color: #15803d;
+        }
+
+        .red {
+            color: #dc2626;
+        }
+
+        .skill {
+            display: inline-block;
+            background: #e0edff;
+            color: #1d4ed8;
+            padding: 8px 13px;
+            border-radius: 20px;
+            margin: 5px;
+            font-size: 13px;
+        }
+
+        .missing {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .recommendation {
+            background: #f8fafc;
+            padding: 13px;
+            margin: 10px 0;
+            border-left: 4px solid #2563eb;
+            border-radius: 5px;
         }
 
         .error {
-            color: red;
-            margin-top: 15px;
+            color: #dc2626;
+            background: #fee2e2;
+            padding: 15px;
+            border-radius: 8px;
         }
 
-        li {
-            margin: 8px 0;
+        footer {
+            text-align: center;
+            padding: 25px;
+            color: #64748b;
+        }
+
+        @media(max-width: 650px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                padding: 20px;
+            }
         }
     </style>
 </head>
 
 <body>
 
+<header>
+    <h1>GenAI Resume & Job Match Analyzer</h1>
+    <p>AI-powered resume analysis and career improvement platform</p>
+</header>
+
 <div class="container">
 
-    <h1>GenAI Resume & Job Match Analyzer</h1>
+    <div class="card">
 
-    <p>Upload your resume and compare it against a job description.</p>
+        <h2>Analyze Your Resume</h2>
 
-    <form method="POST" enctype="multipart/form-data">
+        <p>Upload your resume and compare it against your target job.</p>
 
-        <h3>Upload Resume</h3>
+        <form method="POST" enctype="multipart/form-data">
 
-        <input
-            type="file"
-            name="resume"
-            accept=".pdf,.docx"
-            required
-        >
+            <label><b>Upload Resume (PDF / DOCX)</b></label>
 
-        <h3>Paste Job Description</h3>
+            <input
+                type="file"
+                name="resume"
+                accept=".pdf,.docx"
+                required
+            >
 
-        <textarea
-            name="job_description"
-            rows="10"
-            placeholder="Paste job description here..."
-            required
-        ></textarea>
+            <label><b>Job Description</b></label>
 
-        <br><br>
+            <textarea
+                name="job_description"
+                rows="8"
+                placeholder="Paste the complete job description..."
+                required
+            ></textarea>
 
-        <button type="submit">Analyze Resume</button>
+            <button type="submit">Analyze My Resume</button>
 
-    </form>
+        </form>
+
+    </div>
 
 
     {% if result %}
 
-    <div class="result">
+    {% set score = result.score|float %}
 
-        <h2>Analysis Results</h2>
+    <div class="card">
 
-        <p>Resume Match Score</p>
+        <h2>Resume Analysis Dashboard</h2>
 
-        <div class="score">
-            {{ result.score }}%
+        <p>Your Resume Match Score</p>
+
+        <div class="score">{{ result.score }}%</div>
+
+        <div class="progress">
+            <div
+                class="progress-fill"
+                style="width: {{ [[score, 100]|min, 0]|max }}%">
+            </div>
         </div>
 
-        <h3>Matched Skills ({{ result.matched|length }})</h3>
+        <p>Weighted Skill Coverage:
+            <b>{{ result.skill_gap.weighted_coverage }}%</b>
+        </p>
 
-        <ul>
-            {% for skill in result.matched %}
-                <li>{{ skill }}</li>
-            {% endfor %}
-        </ul>
+    </div>
 
 
-        <h3>Missing Skills ({{ result.missing|length }})</h3>
+    <div class="grid">
 
-        <ul>
-            {% for skill in result.missing %}
-                <li>{{ skill }}</li>
-            {% endfor %}
-        </ul>
+        <div class="stat">
+            <h3>Total Required Skills</h3>
+            <strong>{{ result.skill_gap.total_required_skills }}</strong>
+        </div>
+
+        <div class="stat">
+            <h3>Matched Skills</h3>
+            <strong class="green">
+                {{ result.skill_gap.matched_count }}
+            </strong>
+        </div>
+
+        <div class="stat">
+            <h3>Missing Skills</h3>
+            <strong class="red">
+                {{ result.skill_gap.missing_count }}
+            </strong>
+        </div>
+
+        <div class="stat">
+            <h3>Weighted Coverage</h3>
+            <strong>{{ result.skill_gap.weighted_coverage }}%</strong>
+        </div>
+
+    </div>
 
 
-        <h3>Skill Gap Analysis</h3>
+    <div class="card">
 
-        <p>Total Required Skills: {{ result.total }}</p>
+        <h2>Matched Skills</h2>
 
-        <p>Matched Skills: {{ result.matched_count }}</p>
+        {% for item in result.skill_gap.matched_skills %}
+            <span class="skill">
+                {{ item.skill }} - {{ item.priority }}
+            </span>
+        {% else %}
+            <p>No matched skills found.</p>
+        {% endfor %}
 
-        <p>Missing Skills: {{ result.missing_count }}</p>
+    </div>
 
 
-        <h3>Personalized Learning Recommendations</h3>
+    <div class="card">
 
-        <ul>
-            {% for recommendation in result.recommendations %}
-                <li>{{ recommendation }}</li>
-            {% endfor %}
-        </ul>
+        <h2>Missing Skills</h2>
+
+        {% for item in result.skill_gap.missing_skills %}
+            <span class="skill missing">
+                {{ item.skill }} - {{ item.priority }}
+            </span>
+        {% else %}
+            <p>No missing skills identified.</p>
+        {% endfor %}
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>Personalized Resume Recommendations</h2>
+
+        <h3>Priority Actions</h3>
+
+        {% for item in result.recommendations.priority_actions %}
+            <div class="recommendation">
+                {{ item }}
+            </div>
+        {% else %}
+            <p>No critical skill gaps identified.</p>
+        {% endfor %}
+
+
+        <h3>Resume Improvement Suggestions</h3>
+
+        {% for item in result.recommendations.resume_recommendations %}
+            <div class="recommendation">
+                {{ item }}
+            </div>
+        {% endfor %}
+
+
+        <h3>Suggested Projects</h3>
+
+        {% for item in result.recommendations.project_suggestions %}
+            <div class="recommendation">
+                {{ item }}
+            </div>
+        {% else %}
+            <p>No additional project suggestions.</p>
+        {% endfor %}
+
+    </div>
+
+
+    <div class="card">
+
+        <h2>Your Next Action</h2>
+
+        <p>{{ result.recommendations.next_action }}</p>
 
     </div>
 
@@ -173,19 +377,21 @@ HTML = """
 
 
     {% if error %}
-
-        <p class="error">{{ error }}</p>
-
+        <div class="error">{{ error }}</div>
     {% endif %}
 
 </div>
+
+<footer>
+    GenAI Resume & Job Match Analyzer | Built with Python and Flask
+</footer>
 
 </body>
 </html>
 """
 
 
-# Validate file extension
+
 def allowed_file(filename):
 
     return (
@@ -194,7 +400,6 @@ def allowed_file(filename):
     )
 
 
-# Home route
 @app.route("/", methods=["GET", "POST"])
 def home():
 
@@ -207,7 +412,7 @@ def home():
 
         job_description = request.form.get(
             "job_description", ""
-        ).strip()
+        )
 
         if not file or not file.filename:
 
@@ -217,7 +422,7 @@ def home():
 
             error = "Only PDF and DOCX files are supported."
 
-        elif not job_description:
+        elif not job_description.strip():
 
             error = "Please enter a job description."
 
@@ -225,10 +430,8 @@ def home():
 
             try:
 
-                # Create upload directory
                 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-                # Secure uploaded filename
                 filename = secure_filename(file.filename)
 
                 file_path = os.path.join(
@@ -238,70 +441,74 @@ def home():
 
                 file.save(file_path)
 
-                # Step 1: Extract resume text
+
+                # STEP 1: Extract resume text
+
                 resume_text = extract_resume_text(file_path)
 
-                if not resume_text.strip():
-                    raise ValueError(
-                        "Could not extract text from the resume."
-                    )
 
-                # Step 2: Extract resume details
+                # STEP 2: Analyze resume
+
                 resume_details = extract_resume_details(
                     resume_text
                 )
 
-                # Step 3: Extract job description skills
+
+                # STEP 3: Analyze job description
+
                 job_details = analyze_job_description(
                     job_description
                 )
 
-                required_skills = job_details["required_skills"]
 
-                if not required_skills:
-                    raise ValueError(
-                        "No recognized skills found in job description."
-                    )
+                # STEP 4: Calculate resume match
 
-                # Step 4: Advanced skill gap analysis
-                skill_analysis = analyze_skill_gaps(
-                    required_skills,
-                    resume_details.get("skills", [])
+                match = calculate_match(
+                    resume_details,
+                    job_details
                 )
 
-                # Step 5: Prepare results
+
+                # STEP 5: Advanced skill gap analysis
+
+                skill_gap_analysis = analyze_skill_gaps(
+                    job_details["required_skills"],
+                    resume_details["skills"]
+                )
+
+
+                # STEP 6: Generate improvement recommendations
+
+                recommendations = generate_resume_recommendations(
+                    resume_details,
+                    job_details,
+                    skill_gap_analysis
+                )
+
+
+                # STEP 7: Prepare final results
+
                 result = {
-                    "score": skill_analysis["weighted_coverage"],
 
-                    "matched": [
-                        item["skill"]
-                        for item in skill_analysis["matched_skills"]
-                    ],
+                    "score": match["match_percentage"],
 
-                    "missing": [
-                        item["skill"]
-                        for item in skill_analysis["missing_skills"]
-                    ],
+                    "matched": match["matched_skills"],
 
-                    "total": skill_analysis["total_required_skills"],
+                    "missing": match["missing_skills"],
 
-                    "matched_count": skill_analysis["matched_count"],
+                    "skill_gap": skill_gap_analysis,
 
-                    "missing_count": skill_analysis["missing_count"],
+                    "recommendations": recommendations
 
-                    "recommendations": skill_analysis["recommendations"]
                 }
 
-                # Debug information
-                print("\\nRESUME DETAILS:", resume_details)
-                print("\\nJOB DETAILS:", job_details)
-                print("\\nSKILL ANALYSIS:", skill_analysis)
 
             except Exception as e:
 
+                app.logger.exception("Resume analysis failed")
+
                 error = f"Analysis failed: {str(e)}"
 
-                print("ERROR:", str(e))
 
     return render_template_string(
         HTML,
@@ -310,21 +517,6 @@ def home():
     )
 
 
-# Health check endpoint
-@app.route("/health", methods=["GET"])
-def health():
-
-    return {
-        "status": "healthy",
-        "service": "GenAI Resume & Job Match Analyzer"
-    }
-
-
-# Run application
 if __name__ == "__main__":
 
-    app.run(
-        host="127.0.0.1",
-        port=5000,
-        debug=True
-    )
+    app.run(debug=True)
