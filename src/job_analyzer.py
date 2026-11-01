@@ -1,30 +1,42 @@
 
-import re
+SKILL_DATABASE = [
+    "python",
+    "sql",
+    "machine learning",
+    "deep learning",
+    "nlp",
+    "rag",
+    "langchain",
+    "llm",
+    "transformers",
+    "vector databases",
+    "embeddings",
+    "aws",
+    "fastapi",
+    "flask",
+    "pandas",
+    "numpy",
+    "scikit-learn",
+    "tensorflow",
+    "pytorch",
+    "docker",
+    "git",
+    "rest api"
+]
 
-def analyze_job_description(text):
 
-    skills = [
-        "Python", "SQL", "Java", "JavaScript",
-        "Flask", "FastAPI", "Django",
-        "Pandas", "NumPy", "Scikit-learn",
-        "Machine Learning", "Deep Learning",
-        "NLP", "LangChain", "RAG",
-        "Power BI", "Excel", "AWS",
-        "Docker", "Git", "MongoDB",
-        "MySQL", "TensorFlow", "PyTorch",
-        "Transformers", "ChromaDB", "FAISS"
-    ]
+def analyze_job_description(job_description):
 
-    found_skills = [
-        skill for skill in skills
-        if re.search(
-            r'(?<!\w)' + re.escape(skill) + r'(?!\w)',
-            text,
-            re.IGNORECASE
-        )
-    ]
+    text = job_description.lower()
+
+    required_skills = []
+
+    for skill in SKILL_DATABASE:
+
+        if skill in text:
+            required_skills.append(skill)
 
     return {
-        "required_skills": found_skills,
-        "total_skills": len(found_skills)
+        "required_skills": required_skills,
+        "total_skills": len(required_skills)
     }
