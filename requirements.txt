@@ -1,4 +1,3 @@
-
 Flask
 python-dotenv
 PyMuPDF
@@ -11,3 +10,4 @@ langchain
 langchain-community
 chromadb
 pypdf
+gunicorn
