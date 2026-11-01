@@ -1,3 +1,4 @@
+from src.semantic_matcher import semantic_search
 
 def calculate_match(resume_details, job_details):
 
@@ -27,4 +28,19 @@ def calculate_match(resume_details, job_details):
         "matched_skills": sorted(matched_skills),
         "missing_skills": sorted(missing_skills),
         "total_required_skills": total_skills
+    }
+
+
+
+
+def calculate_combined_match(resume_text, job_description):
+
+    semantic_results = semantic_search(
+        resume_text,
+        job_description
+    )
+
+    return {
+        "semantic_results": semantic_results,
+        "total_sections_found": len(semantic_results)
     }
