@@ -1,6 +1,7 @@
 
 from flask import Flask, request, render_template_string
 import os
+import uuid
 from werkzeug.utils import secure_filename
 
 from src.resume_parser import extract_resume_text
@@ -18,6 +19,7 @@ UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {"pdf", "docx"}
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB maximum upload
 
 
 
@@ -393,122 +395,138 @@ HTML = """
 
 
 def allowed_file(filename):
+    """Return True only for supported resume file extensions."""
+    if not filename or "." not in filename:
+        return False
 
-    return (
-        "." in filename
-        and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-    )
+    extension = filename.rsplit(".", 1)[1].lower()
+    return extension in ALLOWED_EXTENSIONS
+
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    """Show a friendly message when an uploaded request exceeds the size limit."""
+    return render_template_string(
+        HTML,
+        result=None,
+        error="The uploaded file is too large. Please upload a PDF or DOCX up to 5 MB."
+    ), 413
 
 
 @app.route("/", methods=["GET", "POST"])
 def home():
-
     result = None
     error = None
 
     if request.method == "POST":
-
         file = request.files.get("resume")
+        job_description = request.form.get("job_description", "")
+        file_path = None
 
-        job_description = request.form.get(
-            "job_description", ""
-        )
-
+        # Validate user input before starting the analysis pipeline.
         if not file or not file.filename:
-
             error = "Please upload a resume."
 
         elif not allowed_file(file.filename):
-
             error = "Only PDF and DOCX files are supported."
 
         elif not job_description.strip():
-
             error = "Please enter a job description."
 
         else:
-
             try:
+                os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+                # Sanitize the original filename and make it unique so that
+                # uploads with the same name do not overwrite each other.
+                safe_filename = secure_filename(file.filename)
+                if not safe_filename:
+                    raise ValueError("The uploaded filename is invalid. Please rename the file and try again.")
 
-                filename = secure_filename(file.filename)
-
+                unique_filename = f"{uuid.uuid4().hex}_{safe_filename}"
                 file_path = os.path.join(
-                    UPLOAD_FOLDER,
-                    filename
+                    app.config["UPLOAD_FOLDER"],
+                    unique_filename
                 )
-
                 file.save(file_path)
 
-
-                # STEP 1: Extract resume text
-
+                # STEP 1: Extract resume text.
                 resume_text = extract_resume_text(file_path)
 
+                # Stop if the file is empty, scanned without OCR, or unreadable.
+                if not resume_text or not resume_text.strip():
+                    raise ValueError(
+                        "We couldn't extract readable text from this resume. "
+                        "Please upload a text-based PDF or DOCX file."
+                    )
 
-                # STEP 2: Analyze resume
+                # STEP 2: Extract structured resume information.
+                resume_details = extract_resume_details(resume_text)
 
-                resume_details = extract_resume_details(
-                    resume_text
-                )
+                if not isinstance(resume_details, dict):
+                    raise ValueError("We couldn't understand the information in this resume. Please check the file and try again.")
 
+                # STEP 3: Analyze the job description.
+                job_details = analyze_job_description(job_description.strip())
 
-                # STEP 3: Analyze job description
+                if not isinstance(job_details, dict):
+                    raise ValueError("We couldn't analyze this job description. Please provide a clearer job description.")
 
-                job_details = analyze_job_description(
-                    job_description
-                )
+                required_skills = job_details.get("required_skills", [])
+                resume_skills = resume_details.get("skills", [])
 
+                if not isinstance(required_skills, (list, tuple, set)):
+                    raise ValueError("The job description could not be processed correctly. Please try another description.")
 
-                # STEP 4: Calculate resume match
+                if not isinstance(resume_skills, (list, tuple, set)):
+                    raise ValueError("We couldn't identify the skills in this resume. Please check the resume content.")
 
-                match = calculate_match(
-                    resume_details,
-                    job_details
-                )
+                # STEP 4: Calculate the existing resume-to-job match score.
+                match = calculate_match(resume_details, job_details)
 
-
-                # STEP 5: Advanced skill gap analysis
-
+                # STEP 5: Perform weighted skill-gap analysis.
                 skill_gap_analysis = analyze_skill_gaps(
-                    job_details["required_skills"],
-                    resume_details["skills"]
+                    required_skills,
+                    resume_skills
                 )
 
-
-                # STEP 6: Generate improvement recommendations
-
+                # STEP 6: Generate personalized improvement recommendations.
                 recommendations = generate_resume_recommendations(
                     resume_details,
                     job_details,
                     skill_gap_analysis
                 )
 
-
-                # STEP 7: Prepare final results
-
+                # STEP 7: Prepare the data expected by the existing dashboard.
                 result = {
-
                     "score": match["match_percentage"],
-
                     "matched": match["matched_skills"],
-
                     "missing": match["missing_skills"],
-
                     "skill_gap": skill_gap_analysis,
-
                     "recommendations": recommendations
-
                 }
 
+            except ValueError as e:
+                # Expected validation problems can be explained to the user.
+                error = str(e)
 
-            except Exception as e:
-
+            except Exception:
+                # Keep technical details in the server log, not in the browser.
                 app.logger.exception("Resume analysis failed")
+                error = "Something went wrong while analyzing your resume. Please check the file and try again."
 
-                error = f"Analysis failed: {str(e)}"
-
+            finally:
+                # Resumes are processed temporarily and deleted after analysis,
+                # whether the analysis succeeds or fails.
+                if file_path and os.path.isfile(file_path):
+                    try:
+                        os.remove(file_path)
+                    except OSError:
+                        app.logger.warning(
+                            "Could not delete temporary upload: %s",
+                            file_path,
+                            exc_info=True
+                        )
 
     return render_template_string(
         HTML,
@@ -518,5 +536,4 @@ def home():
 
 
 if __name__ == "__main__":
-
     app.run(debug=True)
