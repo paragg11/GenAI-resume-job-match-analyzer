@@ -1,50 +1,66 @@
 # GenAI Resume & Job Match Analyzer
 
-A Python-based web application that analyzes resumes against job descriptions, calculates compatibility scores, identifies skill gaps, and generates actionable resume improvement recommendations.
+A Python and Flask-based application that analyzes resumes against job descriptions, calculates matching scores, identifies skill gaps, and generates personalized resume improvement recommendations.
 
-## Project Overview
+## 🚀 Live Demo
 
-The GenAI Resume & Job Match Analyzer helps candidates understand how closely their resumes align with specific job requirements.
+**Try the application:**  
+https://genai-resume-job-match-analyzer.onrender.com
 
-Users can upload a resume in PDF or DOCX format and paste a job description. The application extracts relevant skills, evaluates the match, highlights missing skills, and suggests improvements.
+Upload your resume in PDF or DOCX format, paste a job description, and receive an analysis of your job readiness.
 
-## Key Features
+## ✨ Features
 
-- **Resume Parsing:** Extracts text from PDF and DOCX resumes.
-- **Skill Extraction:** Identifies technical skills from resumes and job descriptions.
-- **Resume-to-Job Matching:** Calculates a compatibility score based on identified skills.
-- **Weighted Skill Gap Analysis:** Categorizes missing skills by priority (Critical, Important, Optional).
-- **Personalized Recommendations:** Suggests resume improvements and relevant projects based on identified gaps.
-- **Interactive Dashboard:** Displays match scores, matched skills, missing skills, and recommendations.
-- **Input Validation:** Handles unsupported file types, empty inputs, and oversized uploads.
-- **Temporary File Cleanup:** Removes uploaded resume files after processing.
+- **Resume Parsing:** Extract text from PDF and DOCX resumes.
+- **Resume Skill Extraction:** Identify technical skills from resume content.
+- **Job Description Analysis:** Extract relevant skills and requirements from job descriptions.
+- **Resume Match Score:** Calculate the percentage of matching skills.
+- **Weighted Skill Gap Analysis:** Identify matched and missing skills based on their importance.
+- **Personalized Recommendations:** Generate improvement suggestions based on missing skills.
+- **Priority Actions:** Highlight critical skills that require attention.
+- **Project Suggestions:** Recommend practical projects to help demonstrate missing technical skills.
+- **Input Validation:** Validate file formats, empty inputs, and upload size.
+- **Web Dashboard:** Display analysis results through a Flask-based interface.
 
-## Technology Stack
+## 🛠️ Technology Stack
 
 | Category | Technologies |
 |---|---|
 | Programming | Python |
-| Web Framework | Flask |
+| Backend | Flask |
 | Resume Parsing | PyMuPDF, python-docx |
-| Data Processing | NumPy, Pandas |
-| Machine Learning Libraries | Sentence Transformers, Scikit-learn |
-| NLP / GenAI Exploration | LangChain, ChromaDB |
+| Data Processing | Python |
+| Machine Learning Libraries | Scikit-learn, NumPy |
+| Deployment | Render |
+| Production Server | Gunicorn |
 | Version Control | Git, GitHub |
 
-*Note: The current application flow uses skill extraction, rule-based matching, weighted skill-gap analysis, and rule-based recommendations. Semantic matching and RAG are planned enhancements, not currently integrated into the main analysis flow.*
+## ⚙️ Application Workflow
 
-## Application Workflow
+1. Upload a resume in PDF or DOCX format.
+2. Extract text from the uploaded resume.
+3. Identify skills and relevant resume information.
+4. Analyze the provided job description.
+5. Extract required job skills.
+6. Calculate the resume-to-job matching score.
+7. Perform weighted skill gap analysis.
+8. Generate personalized recommendations and project suggestions.
+9. Display the results in the dashboard.
 
-1. Upload a resume (PDF or DOCX).
-2. Paste the target job description.
-3. Extract resume text and candidate skills.
-4. Identify required skills from the job description.
-5. Calculate the resume-to-job match score.
-6. Perform weighted skill-gap analysis.
-7. Generate personalized improvement recommendations.
-8. Display the results in the dashboard.
+## 📊 Analysis Output
 
-## Project Structure
+The application provides:
+
+- Resume match percentage
+- Total required skills
+- Matched skills
+- Missing skills
+- Weighted skill coverage
+- Critical skill priorities
+- Resume improvement recommendations
+- Suggested technical projects
+
+## 📁 Project Structure
 
 ```text
 GenAI-resume-job-match-analyzer/
@@ -55,6 +71,7 @@ GenAI-resume-job-match-analyzer/
 ├── .gitignore
 │
 ├── src/
+│   ├── __init__.py
 │   ├── resume_parser.py
 │   ├── resume_analyzer.py
 │   ├── job_analyzer.py
@@ -65,19 +82,27 @@ GenAI-resume-job-match-analyzer/
 │
 ├── uploads/
 │
-└── tests/
+├── sample_resume.pdf
+├── sample_resume.docx
+│
+└── test_*.py
 ```
 
-## Installation and Setup
+## 💻 Run Locally
 
 ### 1. Clone the repository
 
 ```bash
 git clone https://github.com/paragg11/GenAI-resume-job-match-analyzer.git
+```
+
+### 2. Navigate to the project
+
+```bash
 cd GenAI-resume-job-match-analyzer
 ```
 
-### 2. Create a virtual environment
+### 3. Create a virtual environment
 
 ```bash
 python -m venv venv
@@ -85,63 +110,80 @@ python -m venv venv
 
 Activate it:
 
+**Linux / macOS**
+```bash
+source venv/bin/activate
+```
+
 **Windows**
 ```bash
 venv\Scripts\activate
 ```
 
-**macOS / Linux**
-```bash
-source venv/bin/activate
-```
-
-### 3. Install dependencies
+### 4. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Run the application
+### 5. Run the application
 
 ```bash
 python app.py
 ```
 
-Open your browser at:
+Open:
 
-```text
-http://127.0.0.1:5000
+http://127.0.0.1:5000/
+
+## 🧪 Testing
+
+The project includes separate test scripts for its core modules:
+
+```bash
+python test_parser.py
+python test_job.py
+python test_matcher.py
+python test_semantic.py
+python test_skill_gap.py
+python test_combined.py
 ```
 
-## Testing
+## ☁️ Deployment
 
-The application has been manually tested with job descriptions for:
+The application is deployed on **Render** using:
 
-- Data Analyst
-- Python Developer
-- GenAI Engineer
+- Python 3
+- Build command: `pip install -r requirements.txt`
+- Start command: `gunicorn app:app`
 
-Additional validation scenarios include supported file formats and input handling.
+Live application:
 
-## Current Limitations
+https://genai-resume-job-match-analyzer.onrender.com
 
-- Skill extraction relies on predefined keywords.
-- Matching scores should be treated as guidance, not a hiring decision.
-- Recommendations are generated using predefined rules.
-- Semantic matching and RAG integration remain future enhancements.
+## 🔮 Future Enhancements
 
-## Future Enhancements
+- Integrate LLM-powered resume analysis.
+- Implement semantic matching using sentence embeddings.
+- Add Retrieval-Augmented Generation (RAG).
+- Integrate vector databases for semantic retrieval.
+- Generate AI-powered resume rewriting suggestions.
+- Add downloadable resume analysis reports.
+- Introduce user accounts and analysis history.
 
-- Integrate semantic similarity using Sentence Transformers.
-- Implement a complete RAG pipeline for contextual resume analysis.
-- Integrate an LLM for more contextual resume recommendations.
-- Add automated unit and integration tests.
-- Deploy the application to a cloud platform.
+*Note: LLM-powered analysis, semantic matching, and RAG are planned enhancements and are not currently part of the active application workflow.*
 
-## Author
+## 👨‍💻 Author
 
 **Parag Gunjal**
 
-GitHub: [@paragg11](https://github.com/paragg11)
+Aspiring GenAI Engineer | Python Developer | Data Analyst
 
-Project Repository: [GenAI Resume & Job Match Analyzer](https://github.com/paragg11/GenAI-resume-job-match-analyzer)
+- GitHub: https://github.com/paragg11
+- LinkedIn: https://www.linkedin.com/in/parag-gunjal-b16840152/
+
+---
+
+If you find this project useful, feel free to explore the repository and share your feedback.
+
+**Built with Python and Flask.**
