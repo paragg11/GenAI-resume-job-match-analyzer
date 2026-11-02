@@ -1,5 +1,5 @@
 
-# Step 8: Advanced Skill Gap Analysis
+# Advanced Skill Gap Analysis
 
 # Define skill importance and weights
 SKILL_WEIGHTS = {
